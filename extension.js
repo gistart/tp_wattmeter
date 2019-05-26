@@ -25,57 +25,41 @@ var WattMeter = class WattMeter extends PanelMenu.Button {
         this.meta = meta;
     }
     _init() {
-        log("Executing init function...");
-        try {
-            //Button ui
-            super._init(St.Align.START);
-            this.mainBox = null;
-            this.buttonText = new St.Label({ text: _("(...)"), y_align: Clutter.ActorAlign.CENTER });
-            this.actor.add_actor(this.buttonText);
-            this.rateWindows = [];
-            this.lastStatus = 'unknown';
-            // this.connect('activate', function () {
-            //     Lang.bind(this, this._enable())
-            // });
-        } catch (e) {
-            log(`FUCK: ${e} ${e.stack} `);
-        }
-        log("Init done");
+        super._init(St.Align.START);
+        this.mainBox = null;
+        this.buttonText = new St.Label({ text: _("(...)"), y_align: Clutter.ActorAlign.CENTER });
+        this.actor.add_actor(this.buttonText);
+        this.powerWindows = [];
+        this.lastStatus = 'unknown';
     }
 
     _measure() {
         this.lastStatus = getStatus().trim();
         if (this.lastStatus !== 'Discharging') {
-            this.rateWindows = [];
+            this.powerWindows = [];
             return true;
         }
         const current = getCurrent();
         const voltage = getVoltage();
         if (current < 0 || voltage < 0) {
-            this.rateWindows = [];
+            this.powerWindows = [];
             return true;
         }
-        const rate = current * voltage;
-        this.rateWindows.push(rate);
-        if (this.rateWindows.length >= WINDOW_SIZE) {
-            this.rateWindows.shift();
+        const power = current * voltage;
+        this.powerWindows.push(power);
+        if (this.powerWindows.length >= WINDOW_SIZE) {
+            this.powerWindows.shift();
         }
         return true;
-
     }
     _refresh() {
-        //log('refreshing')
-
         let temp = this.buttonText;
         let power_text = '';
 
-
-        if (this.rateWindows.length < 1) {
+        if (this.powerWindows.length < 1) {
             power_text = this.lastStatus != null ? this.lastStatus : 'N/A';
         } else {
-            let avg = this.rateWindows.reduce(function (acc, elem) {
-                return acc + elem;
-            }, 0.0) / this.rateWindows.length;
+            let avg = this.powerWindows.reduce((acc, elem) => acc + elem, 0.0) / this.powerWindows.length;
             power_text = avg.toFixed(2) + ' W'
         }
 
@@ -98,6 +82,7 @@ var WattMeter = class WattMeter extends PanelMenu.Button {
 const GObject = imports.gi.GObject;
 const Config = imports.misc.config;
 let shellMinorVersion = parseInt(Config.PACKAGE_VERSION.split('.')[1]);
+
 if (shellMinorVersion > 30) {
     WattMeter = GObject.registerClass(
         { GTypeName: 'WattMeter' },
@@ -121,12 +106,9 @@ function getCurrent() {
 
 function readFileSafely(filePath, defaultValue) {
     try {
-        // if (checkFile(filePath)) {
         return Shell.get_file_contents_utf8_sync(filePath);
-
-        // }
     } catch (e) {
-        log('Error occurred: ' + e, e);
+        log(`Cannot read file ${filePath}`, e);
     }
     return defaultValue;
 }
