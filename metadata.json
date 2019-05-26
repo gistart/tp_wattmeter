@@ -1,6 +1,7 @@
 {
     "name": "wattmeter",
     "uuid": "wattmeter@bb",
+    "url": "https://bitbucket.org/blackBriar/wattmeter",
     "description": "Shows battery power consumption",
     "shell-version": [
         "3.30.0"
