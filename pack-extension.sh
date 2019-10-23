@@ -1,3 +1,3 @@
 #!/bin/bash
 
-zip -j wattmeter.zip extension.js metadata.json 
+zip -j tp_wattmeter.zip extension.js metadata.json stylesheet.css

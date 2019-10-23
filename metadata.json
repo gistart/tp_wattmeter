@@ -1,8 +1,8 @@
 {
-    "name": "wattmeter",
-    "uuid": "wattmeter@bb",
-    "url": "https://bitbucket.org/blackBriar/wattmeter",
-    "description": "Shows battery power consumption",
+    "name": "tp_wattmeter",
+    "uuid": "tp_wattmeter@gistart",
+    "url": "https://github.com/gistart/tp_wattmeter",
+    "description": "Shows battery power consumption of ThinkPad laptops",
     "shell-version": [
         "3.30.0"
     ]

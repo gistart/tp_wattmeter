@@ -9,17 +9,15 @@ const Shell = imports.gi.Shell;
 
 const Clutter = imports.gi.Clutter
 
-const VOLTAGE_NOW = "/sys/class/power_supply/BAT0/voltage_now";
-const CURRENT_NOW = "/sys/class/power_supply/BAT0/current_now";
-const STATUS = "/sys/class/power_supply/BAT0/status";
+const POWER_NOW = "/sys/class/power_supply/BAT0/power_now";
 const WINDOW_SIZE = 100;
 
 let meta;
-let wattmeter;
+let tp_wattmeter;
 let label;
 let interval;
 
-var WattMeter = class WattMeter extends PanelMenu.Button {
+var TPWattMeter = class TPWattMeter extends PanelMenu.Button {
     constructor(meta) {
         super();
         this.meta = meta;
@@ -27,25 +25,23 @@ var WattMeter = class WattMeter extends PanelMenu.Button {
     _init() {
         super._init(St.Align.START);
         this.mainBox = null;
-        this.buttonText = new St.Label({ text: _("(...)"), y_align: Clutter.ActorAlign.CENTER });
+        this.buttonText = new St.Label({
+            text: _("?W"), 
+            y_align: Clutter.ActorAlign.CENTER,
+            style_class: 'tp_wattmeter_lbl',
+        });
         this.actor.add_actor(this.buttonText);
         this.powerWindows = [];
-        this.lastStatus = 'unknown';
+        this.lastStatus = '?W';
     }
 
     _measure() {
-        this.lastStatus = getStatus().trim();
-        if (this.lastStatus !== 'Discharging') {
+        const power = getPower();
+        if (power < 0) {
             this.powerWindows = [];
             return true;
         }
-        const current = getCurrent();
-        const voltage = getVoltage();
-        if (current < 0 || voltage < 0) {
-            this.powerWindows = [];
-            return true;
-        }
-        const power = current * voltage;
+
         this.powerWindows.push(power);
         if (this.powerWindows.length >= WINDOW_SIZE) {
             this.powerWindows.shift();
@@ -60,7 +56,7 @@ var WattMeter = class WattMeter extends PanelMenu.Button {
             power_text = this.lastStatus != null ? this.lastStatus : 'N/A';
         } else {
             let avg = this.powerWindows.reduce((acc, elem) => acc + elem, 0.0) / this.powerWindows.length;
-            power_text = avg.toFixed(2) + ' W'
+            power_text = avg.toFixed(2) + 'W'
         }
 
         temp.set_text(power_text);
@@ -68,9 +64,9 @@ var WattMeter = class WattMeter extends PanelMenu.Button {
     }
 
     _enable() {
-        this.measure = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 50,
+        this.measure = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 250,
             Lang.bind(this, this._measure));
-        this.interval = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1000,
+        this.interval = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 5000,
             Lang.bind(this, this._refresh));
     }
 
@@ -84,24 +80,15 @@ const Config = imports.misc.config;
 let shellMinorVersion = parseInt(Config.PACKAGE_VERSION.split('.')[1]);
 
 if (shellMinorVersion > 30) {
-    WattMeter = GObject.registerClass(
-        { GTypeName: 'WattMeter' },
-        WattMeter
+    TPWattMeter = GObject.registerClass(
+        { GTypeName: 'TPWattMeter' },
+        TPWattMeter
     );
 }
 
-function getStatus() {
-    return readFileSafely(STATUS, "Unknown");
-}
-
-function getVoltage() {
-    const voltage = parseFloat(readFileSafely(VOLTAGE_NOW, -1));
-    return voltage === -1 ? voltage : voltage / 1000000;
-}
-
-function getCurrent() {
-    const current = parseFloat(readFileSafely(CURRENT_NOW, -1));
-    return current === -1 ? current : current / 1000000;
+function getPower() {
+    const power = parseFloat(readFileSafely(POWER_NOW), -1);
+    return power === -1 ? power : power / 1000000;
 }
 
 function readFileSafely(filePath, defaultValue) {
@@ -128,13 +115,13 @@ function init(metadata) {
 }
 
 function enable() {
-    wattmeter = new WattMeter(meta);
-    wattmeter._enable();
-    Main.panel.addToStatusArea('wattmeter', wattmeter);
+    tp_wattmeter = new TPWattMeter(meta);
+    tp_wattmeter._enable();
+    Main.panel.addToStatusArea('tp_wattmeter', tp_wattmeter, -1); //, 'right');
 }
 
 function disable() {
-    wattmeter._disable();
-    wattmeter.destroy();
-    wattmeter = null;
+    tp_wattmeter._disable();
+    tp_wattmeter.destroy();
+    tp_wattmeter = null;
 }
