@@ -1,6 +1,5 @@
 const St = imports.gi.St;
 const PanelMenu = imports.ui.panelMenu;
-const PopupMenu = imports.ui.popupMenu;
 const Main = imports.ui.main;
 const Lang = imports.lang;
 const GLib = imports.gi.GLib;
@@ -10,7 +9,6 @@ const Shell = imports.gi.Shell;
 const Clutter = imports.gi.Clutter
 
 const POWER_NOW = "/sys/class/power_supply/BAT0/power_now";
-const WINDOW_SIZE = 100;
 
 let meta;
 let tp_wattmeter;
@@ -26,7 +24,7 @@ var TPWattMeter = class TPWattMeter extends PanelMenu.Button {
         super._init(St.Align.START);
         this.mainBox = null;
         this.buttonText = new St.Label({
-            text: _("?W"), 
+            text: _("?W"),
             y_align: Clutter.ActorAlign.CENTER,
             style_class: 'tp_wattmeter_lbl',
         });
@@ -41,11 +39,7 @@ var TPWattMeter = class TPWattMeter extends PanelMenu.Button {
             this.powerWindows = [];
             return true;
         }
-
         this.powerWindows.push(power);
-        if (this.powerWindows.length >= WINDOW_SIZE) {
-            this.powerWindows.shift();
-        }
         return true;
     }
     _refresh() {
@@ -56,7 +50,10 @@ var TPWattMeter = class TPWattMeter extends PanelMenu.Button {
             power_text = this.lastStatus != null ? this.lastStatus : 'N/A';
         } else {
             let avg = this.powerWindows.reduce((acc, elem) => acc + elem, 0.0) / this.powerWindows.length;
-            power_text = avg.toFixed(2) + 'W'
+            while (this.powerWindows.length) { this.powerWindows.pop(); };
+            this.powerWindows.push(avg);
+
+            power_text = avg.toFixed(2) + 'W';
         }
 
         temp.set_text(power_text);
