@@ -50,8 +50,7 @@ var TPIndicator = class extends BaseIndicator {
 
     _sync() {
         super._sync();
-        const new_text = '<span size="smaller">' + this._getBatteryStatus() + '</span>';
-        this._percentageLabel.clutter_text.set_markup(new_text);
+        this._percentageLabel.clutter_text.set_text(this._getBatteryStatus());
         return true;
     }
 
