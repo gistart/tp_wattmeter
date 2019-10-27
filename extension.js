@@ -1,124 +1,137 @@
-const St = imports.gi.St;
-const PanelMenu = imports.ui.panelMenu;
-const Main = imports.ui.main;
 const Lang = imports.lang;
-const GLib = imports.gi.GLib;
-const Gio = imports.gi.Gio;
+const UPower = imports.gi.UPowerGlib;
+const BaseIndicator = imports.ui.status.power.Indicator;
+const ExtensionUtils = imports.misc.extensionUtils;
+const Panel = imports.ui.main.panel;
 const Shell = imports.gi.Shell;
+const GObject = imports.gi.GObject;
+const GLib = imports.gi.GLib;
+const Config = imports.misc.config;
 
-const Clutter = imports.gi.Clutter
 
+/** Settings
+ */
+
+const HISTORY_DEPTH = 5;
+const MEASURE_PERIOD = 1000;
+const FORCE_SYNC_PERIOD = 5000;
+
+const BAT_STATUS = "/sys/class/power_supply/BAT0/status";
 const POWER_NOW = "/sys/class/power_supply/BAT0/power_now";
 
-let meta;
-let tp_wattmeter;
-let label;
-let interval;
 
-var TPWattMeter = class TPWattMeter extends PanelMenu.Button {
-    constructor(meta) {
+/** Indicator
+ */
+
+var TPIndicator = class extends BaseIndicator {
+    constructor() {
         super();
-        this.meta = meta;
+
+        this.readings = [];
+        this.last_value = 0.0;
+        this.tm_measure = null;
+        this.tm_force_sync = null;
     }
-    _init() {
-        super._init(St.Align.START);
-        this.mainBox = null;
-        this.buttonText = new St.Label({
-            text: _("?W"),
-            y_align: Clutter.ActorAlign.CENTER,
-            style_class: 'tp_wattmeter_lbl',
-        });
-        this.actor.add_actor(this.buttonText);
-        this.powerWindows = [];
-        this.lastStatus = '?W';
+
+    _getBatteryStatus() {
+        const pct = this._proxy.Percentage;
+        const power = this.last_value.toFixed(1);
+        const status = this._read_file(BAT_STATUS, '???');
+
+        let sign = ' ';
+        if (status == 'Charging') {
+            sign = '+';
+        } else if (status == 'Discharging') {
+            sign = '-';
+        }
+
+        return _("%s%% %s%sW").format(pct, sign, power);
+    }
+
+    _sync() {
+        super._sync();
+        this._percentageLabel.clutter_text.set_text(this._getBatteryStatus());
+        return true;
+    }
+
+    _read_file(filePath, defaultValue) {
+        try {
+            return Shell.get_file_contents_utf8_sync(filePath).trim();
+        } catch (e) {
+            log(`Cannot read file ${filePath}`, e);
+        }
+        return defaultValue;
     }
 
     _measure() {
-        const power = getPower();
-        if (power < 0) {
-            this.powerWindows = [];
-            return true;
+        const power = parseFloat(this._read_file(POWER_NOW), 0) / 1000000;
+        this.readings.push(power)
+
+        if (this.readings.length >= HISTORY_DEPTH) {
+            let avg = this.readings.reduce((acc, elem) => acc + elem, 0.0) / this.readings.length;
+            this.last_value = avg;
+
+            while (this.readings.length) { this.readings.pop(); };
+            this.readings.push(avg);
         }
-        this.powerWindows.push(power);
-        return true;
-    }
-    _refresh() {
-        let temp = this.buttonText;
-        let power_text = '';
-
-        if (this.powerWindows.length < 1) {
-            power_text = this.lastStatus != null ? this.lastStatus : 'N/A';
-        } else {
-            let avg = this.powerWindows.reduce((acc, elem) => acc + elem, 0.0) / this.powerWindows.length;
-            while (this.powerWindows.length) { this.powerWindows.pop(); };
-            this.powerWindows.push(avg);
-
-            power_text = avg.toFixed(2) + 'W';
-        }
-
-        temp.set_text(power_text);
         return true;
     }
 
-    _enable() {
-        this.measure = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 250,
+    _force_sync() {
+        this._sync();
+        return true;
+    }
+
+    _spawn() {
+        this.tm_measure = GLib.timeout_add(
+            GLib.PRIORITY_DEFAULT,
+            MEASURE_PERIOD,
             Lang.bind(this, this._measure));
-        this.interval = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 5000,
-            Lang.bind(this, this._refresh));
+        this.tm_force_sync = GLib.timeout_add(
+            GLib.PRIORITY_DEFAULT,
+            FORCE_SYNC_PERIOD,
+            Lang.bind(this, this._force_sync));
     }
 
-    _disable() {
-        GLib.source_remove(this.interval);
-        GLib.source_remove(this.measure);
-    }
-}
-const GObject = imports.gi.GObject;
-const Config = imports.misc.config;
-let shellMinorVersion = parseInt(Config.PACKAGE_VERSION.split('.')[1]);
-
-if (shellMinorVersion > 30) {
-    TPWattMeter = GObject.registerClass(
-        { GTypeName: 'TPWattMeter' },
-        TPWattMeter
-    );
-}
-
-function getPower() {
-    const power = parseFloat(readFileSafely(POWER_NOW), -1);
-    return power === -1 ? power : power / 1000000;
-}
-
-function readFileSafely(filePath, defaultValue) {
-    try {
-        return Shell.get_file_contents_utf8_sync(filePath);
-    } catch (e) {
-        log(`Cannot read file ${filePath}`, e);
-    }
-    return defaultValue;
-}
-function checkFile(filename) {
-    //Checks for the existance of a file
-    if (GLib.file_test(filename, GLib.FileTest.EXISTS)) {
-        return true;
-    }
-    else {
-        return false;
+    _stop() {
+        GLib.source_remove(this.tm_measure);
+        GLib.source_remove(this.tm_force_sync);
     }
 }
 
-// Shell entry points
-function init(metadata) {
-    meta = metadata;
+
+/** Extension
+ */
+
+class TPWattMeter {
+    constructor() {
+        this.customIndicator = new TPIndicator();
+        this.customIndicator._spawn();
+
+        this.aggregateMenu = Panel.statusArea['aggregateMenu'];
+        this.originalIndicator = this.aggregateMenu._power;
+        this.aggregateMenu._indicators.replace_child(this.originalIndicator.indicators, this.customIndicator.indicators);
+    }
+
+    destroy(arg) {
+        this.customIndicator._stop();
+        this.aggregateMenu._indicators.replace_child(this.customIndicator.indicators, this.originalIndicator.indicators);
+        this.customIndicator = null;
+    }
 }
+
+
+/** Init
+ */
+
+let tp_wattmeter;
+
 
 function enable() {
-    tp_wattmeter = new TPWattMeter(meta);
-    tp_wattmeter._enable();
-    Main.panel.addToStatusArea('tp_wattmeter', tp_wattmeter, -1); //, 'right');
+    tp_wattmeter = new TPWattMeter(); //tp_reader, tp_indicator);
 }
 
 function disable() {
-    tp_wattmeter._disable();
     tp_wattmeter.destroy();
     tp_wattmeter = null;
 }
