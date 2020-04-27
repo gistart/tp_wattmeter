@@ -23,82 +23,86 @@ const POWER_NOW = "/sys/class/power_supply/BAT0/power_now";
 /** Indicator
  */
 
-var TPIndicator = class extends BaseIndicator {
-    constructor() {
-        super();
+var TPIndicator = GObject.registerClass(
+    {
+        GTypeName: 'TPIndicator',
+    },
+    class TPIndicator extends BaseIndicator {
+        _init() {
+            super._init();
 
-        this.readings = [];
-        this.last_value = 0.0;
-        this.tm_measure = null;
-        this.tm_force_sync = null;
-    }
-
-    _getBatteryStatus() {
-        const pct = this._proxy.Percentage;
-        const power = this.last_value.toFixed(1);
-        const status = this._read_file(BAT_STATUS, '???');
-
-        let sign = ' ';
-        if (status == 'Charging') {
-            sign = '+';
-        } else if (status == 'Discharging') {
-            sign = '-';
+            this.readings = [];
+            this.last_value = 0.0;
+            this.tm_measure = null;
+            this.tm_force_sync = null;
         }
 
-        return _("%s%% %s%sW").format(pct, sign, power);
-    }
+        _getBatteryStatus() {
+            const pct = this._proxy.Percentage;
+            const power = this.last_value.toFixed(1);
+            const status = this._read_file(BAT_STATUS, '???');
 
-    _sync() {
-        super._sync();
-        this._percentageLabel.clutter_text.set_text(this._getBatteryStatus());
-        return true;
-    }
+            let sign = ' ';
+            if (status == 'Charging') {
+                sign = '+';
+            } else if (status == 'Discharging') {
+                sign = '-';
+            }
 
-    _read_file(filePath, defaultValue) {
-        try {
-            return Shell.get_file_contents_utf8_sync(filePath).trim();
-        } catch (e) {
-            log(`Cannot read file ${filePath}`, e);
+            return _("%s%% %s%sW").format(pct, sign, power);
         }
-        return defaultValue;
-    }
 
-    _measure() {
-        const power = parseFloat(this._read_file(POWER_NOW), 0) / 1000000;
-        this.readings.push(power)
-
-        if (this.readings.length >= HISTORY_DEPTH) {
-            let avg = this.readings.reduce((acc, elem) => acc + elem, 0.0) / this.readings.length;
-            this.last_value = avg;
-
-            while (this.readings.length) { this.readings.pop(); };
-            this.readings.push(avg);
+        _sync() {
+            super._sync();
+            this._percentageLabel.clutter_text.set_text(this._getBatteryStatus());
+            return true;
         }
-        return true;
-    }
 
-    _force_sync() {
-        this._sync();
-        return true;
-    }
+        _read_file(filePath, defaultValue) {
+            try {
+                return Shell.get_file_contents_utf8_sync(filePath).trim();
+            } catch (e) {
+                log(`Cannot read file ${filePath}`, e);
+            }
+            return defaultValue;
+        }
 
-    _spawn() {
-        this.tm_measure = GLib.timeout_add(
-            GLib.PRIORITY_DEFAULT,
-            MEASURE_PERIOD,
-            Lang.bind(this, this._measure));
-        this.tm_force_sync = GLib.timeout_add(
-            GLib.PRIORITY_DEFAULT,
-            FORCE_SYNC_PERIOD,
-            Lang.bind(this, this._force_sync));
-    }
+        _measure() {
+            const power = parseFloat(this._read_file(POWER_NOW), 0) / 1000000;
+            this.readings.push(power)
 
-    _stop() {
-        GLib.source_remove(this.tm_measure);
-        GLib.source_remove(this.tm_force_sync);
-    }
-}
+            if (this.readings.length >= HISTORY_DEPTH) {
+                let avg = this.readings.reduce((acc, elem) => acc + elem, 0.0) / this.readings.length;
+                this.last_value = avg;
 
+                while (this.readings.length) { this.readings.pop(); };
+                this.readings.push(avg);
+            }
+            return true;
+        }
+
+        _force_sync() {
+            this._sync();
+            return true;
+        }
+
+        _spawn() {
+            this.tm_measure = GLib.timeout_add(
+                GLib.PRIORITY_DEFAULT,
+                MEASURE_PERIOD,
+                Lang.bind(this, this._measure));
+            this.tm_force_sync = GLib.timeout_add(
+                GLib.PRIORITY_DEFAULT,
+                FORCE_SYNC_PERIOD,
+                Lang.bind(this, this._force_sync));
+        }
+
+        _stop() {
+            GLib.source_remove(this.tm_measure);
+            GLib.source_remove(this.tm_force_sync);
+        }
+    }
+);
 
 /** Extension
  */
