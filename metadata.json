@@ -5,6 +5,7 @@
     "description": "Shows battery power consumption of ThinkPad laptops",
     "shell-version": [
         "3.36.0",
-        "40.0"
+        "40.0",
+	"42.0"
     ]
 }
