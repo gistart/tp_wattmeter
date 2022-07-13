@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+    <schema id="org.gnome.shell.extensions.tp_wattmeter" path="/org/gnome/shell/extensions/tp_wattmeter/">
+        <key name="avg-of" type="i">
+            <default>5</default>
+        </key>
+        <key name="period-sec" type="d">
+            <default>1.0</default>
+        </key>    
+    </schema>
+</schemalist>
