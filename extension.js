@@ -38,7 +38,7 @@ var TPIndicator = GObject.registerClass(
         }
 
         _getBatteryStatus() {
-            const pct = this._proxy.Percentage;
+            const pct = this._proxy.Percentage.toFixed(0);
             const power = this.last_value.toFixed(1);
             const status = this._read_file(BAT_STATUS, '???');
 
