@@ -2,9 +2,8 @@
     "name": "tp_wattmeter",
     "uuid": "tp_wattmeter@gistart",
     "url": "https://github.com/gistart/tp_wattmeter",
-    "description": "Shows battery power consumption of ThinkPad laptops",
+    "description": "Shows battery power consumption of ThinkPad laptops. Now configurable!",
     "shell-version": [
-        "3.36.0",
         "40",
         "41",
         "42"

@@ -12,10 +12,6 @@ const Config = imports.misc.config;
 /** Settings
  */
 
-const HISTORY_DEPTH = 5;
-const MEASURE_PERIOD = 1000;
-const FORCE_SYNC_PERIOD = 5000;
-
 const BAT_STATUS = "/sys/class/power_supply/BAT0/status";
 const POWER_NOW = "/sys/class/power_supply/BAT0/power_now";
 
@@ -31,14 +27,18 @@ var TPIndicator = GObject.registerClass(
         _init() {
             super._init();
 
+            this.settings = ExtensionUtils.getSettings('org.gnome.shell.extensions.tp_wattmeter');
+
+            // to detect changes FIXME: a better way?
+            this.last_period_val = this.settings.get_double('period-sec');
+
             this.readings = [];
             this.last_value = 0.0;
             this.tm_measure = null;
-            this.tm_force_sync = null;
         }
 
         _getBatteryStatus() {
-            const pct = this._proxy.Percentage;
+            const pct = this._proxy.Percentage.toFixed(0);
             const power = this.last_value.toFixed(1);
             const status = this._read_file(BAT_STATUS, '???');
 
@@ -71,38 +71,39 @@ var TPIndicator = GObject.registerClass(
             const power = parseFloat(this._read_file(POWER_NOW), 0) / 1000000;
             this.readings.push(power)
 
-            if (this.readings.length >= HISTORY_DEPTH) {
-                let avg = this.readings.reduce((acc, elem) => acc + elem, 0.0) / this.readings.length;
-                this.last_value = avg;
+            const period_now = this.settings.get_double('period-sec');
+            if (period_now.toFixed(1) != this.last_period_val.toFixed(1)) {
+                // period changed, re-spawn
+                this._spawn();
+                this.last_period_val = period_now;
+            };
 
-                while (this.readings.length) { this.readings.pop(); };
-                this.readings.push(avg);
-            }
-            return true;
-        }
-
-        _force_sync() {
-            this._sync();
+            const avg_of = this.settings.get_int('avg-of');
+            if (this.readings.length >= avg_of) {
+                this.last_value = this.readings.reduce((acc, elem) => acc + elem, 0.0) / this.readings.length; // simple mean
+                this._sync(); // update battery widget now!
+                this.readings.length = 0;  // fastest way to clear array?
+            } 
             return true;
         }
 
         _spawn() {
+            if (this.tm_measure !== null) {
+                GLib.source_remove(this.tm_measure);
+            }
             this.tm_measure = GLib.timeout_add(
                 GLib.PRIORITY_DEFAULT,
-                MEASURE_PERIOD,
-                Lang.bind(this, this._measure));
-            this.tm_force_sync = GLib.timeout_add(
-                GLib.PRIORITY_DEFAULT,
-                FORCE_SYNC_PERIOD,
-                Lang.bind(this, this._force_sync));
+                this.settings.get_double('period-sec') * 1000,
+                Lang.bind(this, this._measure)
+            );
         }
 
         _stop() {
             GLib.source_remove(this.tm_measure);
-            GLib.source_remove(this.tm_force_sync);
         }
     }
 );
+
 
 /** Extension
  */
@@ -114,12 +115,12 @@ class TPWattMeter {
 
         this.aggregateMenu = Panel.statusArea['aggregateMenu'];
         this.originalIndicator = this.aggregateMenu._power;
-        this.aggregateMenu._indicators.replace_child(this.originalIndicator.indicators, this.customIndicator.indicators);
+        this.aggregateMenu._indicators.replace_child(this.originalIndicator, this.customIndicator);
     }
 
     destroy(arg) {
         this.customIndicator._stop();
-        this.aggregateMenu._indicators.replace_child(this.customIndicator.indicators, this.originalIndicator.indicators);
+        this.aggregateMenu._indicators.replace_child(this.customIndicator, this.originalIndicator);
         this.customIndicator = null;
     }
 }
@@ -132,7 +133,7 @@ let tp_wattmeter;
 
 
 function enable() {
-    tp_wattmeter = new TPWattMeter(); //tp_reader, tp_indicator);
+    tp_wattmeter = new TPWattMeter();
 }
 
 function disable() {
