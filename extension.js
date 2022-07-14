@@ -1,5 +1,3 @@
-const Lang = imports.lang;
-const UPower = imports.gi.UPowerGlib;
 const BaseIndicator = imports.ui.status.power.Indicator;
 const ExtensionUtils = imports.misc.extensionUtils;
 const Panel = imports.ui.main.panel;
@@ -28,9 +26,7 @@ var TPIndicator = GObject.registerClass(
             super._init();
 
             this.settings = ExtensionUtils.getSettings('org.gnome.shell.extensions.tp_wattmeter');
-
-            // to detect changes FIXME: a better way?
-            this.last_period_val = this.settings.get_double('period-sec');
+            this.settings.connect('changed::period-sec', () => { this._spawn(); });  // restart timers on setting change
 
             this.readings = [];
             this.last_value = 0.0;
@@ -71,13 +67,6 @@ var TPIndicator = GObject.registerClass(
             const power = parseFloat(this._read_file(POWER_NOW), 0) / 1000000;
             this.readings.push(power)
 
-            const period_now = this.settings.get_double('period-sec');
-            if (period_now.toFixed(1) != this.last_period_val.toFixed(1)) {
-                // period changed, re-spawn
-                this._spawn();
-                this.last_period_val = period_now;
-            };
-
             const avg_of = this.settings.get_int('avg-of');
             if (this.readings.length >= avg_of) {
                 this.last_value = this.readings.reduce((acc, elem) => acc + elem, 0.0) / this.readings.length; // simple mean
@@ -94,12 +83,13 @@ var TPIndicator = GObject.registerClass(
             this.tm_measure = GLib.timeout_add(
                 GLib.PRIORITY_DEFAULT,
                 this.settings.get_double('period-sec') * 1000,
-                Lang.bind(this, this._measure)
+                this._measure.bind(this),
             );
         }
 
         _stop() {
             GLib.source_remove(this.tm_measure);
+            this.tm_measure = null;
         }
     }
 );
