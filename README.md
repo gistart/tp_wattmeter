@@ -9,3 +9,5 @@ Simple extension to show current power consumption in Gnome battery widget.
 Differs from original wattmeter -- it reads directly from `/sys/class/power_supply/BAT0/power_now`.
 
 Tested with ThinkPad Carbon X1 Gen4
+
+Download from: https://extensions.gnome.org/extension/2308/tp_wattmeter/
