@@ -10,8 +10,10 @@ const Config = imports.misc.config;
 /** Settings
  */
 
-const BAT_STATUS = "/sys/class/power_supply/BAT0/status";
-const POWER_NOW = "/sys/class/power_supply/BAT0/power_now";
+const BAT0_STATUS = "/sys/class/power_supply/BAT0/status";
+const BAT1_STATUS = "/sys/class/power_supply/BAT1/status";
+const BAT0_POWER_NOW = "/sys/class/power_supply/BAT0/power_now";
+const BAT1_POWER_NOW = "/sys/class/power_supply/BAT1/power_now";
 
 
 /** Indicator
@@ -36,15 +38,23 @@ var TPIndicator = GObject.registerClass(
         _getBatteryStatus() {
             const pct = this._proxy.Percentage.toFixed(0);
             const power = this.last_value.toFixed(1);
-            const status = this._read_file(BAT_STATUS, '???');
+            const status0 = this._read_file(BAT0_STATUS, '???');
+            const status1 = this._read_file(BAT1_STATUS, '???');
 
             let sign = ' ';
-            if (status == 'Charging') {
+            if (status0 == 'Charging') {
                 sign = '+';
-            } else if (status == 'Discharging') {
+            } else if (status0 == 'Discharging') {
                 sign = '-';
             }
-
+			  else if (status1 == 'Charging') {
+                sign = '+';
+            }
+              else if (status1 == 'Discharging') {
+                sign = '-';
+            }
+            
+            
             return _("%s%% %s%sW").format(pct, sign, power);
         }
 
@@ -64,7 +74,7 @@ var TPIndicator = GObject.registerClass(
         }
 
         _measure() {
-            const power = parseFloat(this._read_file(POWER_NOW), 0) / 1000000;
+            const power = parseFloat(this._read_file(BAT0_POWER_NOW) + this._read_file(BAT1_POWER_NOW)) / 1000000;
             this.readings.push(power)
 
             const avg_of = this.settings.get_int('avg-of');
