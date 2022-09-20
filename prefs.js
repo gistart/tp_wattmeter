@@ -35,6 +35,14 @@ function fillPreferencesWindow(window) {
     period_row.add_suffix(period_spin);
     period_row.activatable_widget = period_spin;
 
+    // show lap mode for ThinkPads from T490 era (gen 8 intel cpu) onwwards
+
+    const lap_mode_row = new Adw.ActionRow({ title: LBL_LAP_MODE });
+    group.add(lap_mode_row);
+    const lap_mode_switch = makeLapModeSwitch(settings);
+    lap_mode_row.add_suffix(lap_mode_switch);
+    lap_mode_row.activatable_widget = lap_mode_switch;
+
     // done
     window.add(page);
 }
@@ -82,6 +90,7 @@ function buildPrefsWidget() {
 const SETTINGS_ID = 'org.gnome.shell.extensions.tp_wattmeter';
 const LBL_AVG = 'Show average of this many measurements';
 const LBL_PERIOD = 'Period between measurements in seconds';
+const LBL_LAP_MODE = 'Show status of lap mode thermal throttling';
 
 
 function makeAvgOfSpin(settings) {
@@ -102,6 +111,22 @@ function makeAvgOfSpin(settings) {
         Gio.SettingsBindFlags.DEFAULT
     );
     return avg_spin;
+}
+
+function makeLapModeSwitch(settings) {
+    const lap_mode_switch = new Gtk.Switch({
+            active: settings.get_boolean('lap-mode'),
+            halign: Gtk.Align.END,
+            valign: Gtk.Align.CENTER,
+        });
+
+    settings.bind(
+        'lap-mode',
+        lap_mode_switch,
+        'active',
+        Gio.SettingsBindFlags.DEFAULT
+    );
+    return lap_mode_switch;
 }
 
 
