@@ -6,6 +6,9 @@
         </key>
         <key name="period-sec" type="d">
             <default>1.0</default>
-        </key>    
+        </key>
+        <key name="lap-mode" type="b">
+            <default>false</default>
+        </key>
     </schema>
 </schemalist>

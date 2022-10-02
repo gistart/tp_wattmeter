@@ -12,6 +12,7 @@ const Config = imports.misc.config;
 
 const BAT_STATUS = "/sys/class/power_supply/BAT0/status";
 const POWER_NOW = "/sys/class/power_supply/BAT0/power_now";
+const LAPMODE = "/sys/devices/platform/thinkpad_acpi/dytc_lapmode"
 
 
 /** Indicator
@@ -44,8 +45,24 @@ var TPIndicator = GObject.registerClass(
             } else if (status == 'Discharging') {
                 sign = '-';
             }
+            let lap_mode_char = this._getLapMode()
+            return _("%s%% %s%sW%s").format(pct, sign, power, lap_mode_char);
+        }
 
-            return _("%s%% %s%sW").format(pct, sign, power);
+        _getLapMode() {
+            const show_lap_mode = this.settings.get_boolean('lap-mode');
+            if (!show_lap_mode){
+                return ('')
+            }
+            const status = this._read_file(LAPMODE, '???');
+            let lap_mode_char = '';
+            if (status == '1') {
+                lap_mode_char = " lap";
+            }
+            else {
+                lap_mode_char = ''
+            }
+            return (lap_mode_char)
         }
 
         _sync() {
